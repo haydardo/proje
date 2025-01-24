@@ -1,6 +1,6 @@
 # Kullanıcı Yönetim Sistemi API
 
-Bu proje, kullanıcı yönetimi için RESTful API servisleri sunan bir Node.js uygulamasıdır. Kullanıcı kaydı, girişi, şifre sıfırlama ve kullanıcı bilgilerini yönetme gibi temel işlevleri içerir.RESTful API, istemcilerle sunucular arasında veri alışverişi yapmanın standart bir yoludur. HTTP metotları kullanır, web tabanlı uygulamalar için tasarlanmıştır.
+Bu proje, kullanıcı yönetimi için RESTful API servisleri sunan bir Node.js uygulamasıdır. Kullanıcı kaydı, girişi, şifre sıfırlama ve kullanıcı bilgilerini yönetme gibi temel işlevleri içerir.
 
 ## Teknolojiler
 
@@ -10,130 +10,71 @@ Bu proje, kullanıcı yönetimi için RESTful API servisleri sunan bir Node.js u
 - **Sequelize**: ORM (Object-Relational Mapping)
 - **JWT**: Kimlik doğrulama için JSON Web Token
 - **Bcrypt**: Şifre hashleme
+- **Joi**: Veri validasyonu
+- **Nodemailer**: E-posta gönderimi
 - **Mocha & Chai**: Test framework'ü
 
 ## Proje Yapısı
 
 ```
-├── models/                 # Veritabanı modelleri
-│   ├── index.js           # Model ilişkileri ve Sequelize yapılandırması
-│   ├── User.js            # Kullanıcı modeli
-│   └── PasswordReset.js   # Şifre sıfırlama modeli
+├── src/                  # Kaynak kodlar
+│   ├── config/          # Konfigürasyon dosyaları
+│   │   ├── database.js  # Veritabanı ayarları
+│   │   └── email.js     # E-posta ayarları
+│   │
+│   ├── controllers/     # Controller katmanı
+│   │   ├── authController.js   # Kimlik doğrulama işlemleri
+│   │   └── userController.js   # Kullanıcı işlemleri
+│   │
+│   ├── middleware/      # Middleware fonksiyonları
+│   │   └── authMiddleware.js   # JWT ve validasyon kontrolleri
+│   │
+│   ├── models/          # Veritabanı modelleri
+│   │   ├── index.js     # Model ilişkileri
+│   │   ├── User.js      # Kullanıcı modeli
+│   │   └── PasswordReset.js # Şifre sıfırlama modeli
+│   │
+│   ├── routes/          # API route'ları
+│   │   ├── authRoutes.js # Kimlik doğrulama route'ları
+│   │   └── userRoutes.js # Kullanıcı işlemleri route'ları
+│   │
+│   ├── services/        # İş mantığı katmanı
+│   │   ├── authService.js # Kimlik doğrulama servisi
+│   │   └── userService.js # Kullanıcı servisi
+│   │
+│   ├── utils/           # Yardımcı fonksiyonlar
+│   │   ├── validation.js # Joi validasyon şemaları
+│   │   └── helpers.js    # Genel yardımcı fonksiyonlar
+│   │
+│   └── app.js          # Ana uygulama dosyası
 │
-├── routes/                # API route'ları
-│   ├── auth.js           # Kimlik doğrulama route'ları
-│   └── users.js          # Kullanıcı işlemleri route'ları
-│
-├── middleware/           # Middleware fonksiyonları
-│   └── authMiddleware.js # JWT doğrulama ve rol kontrolü
-│
-├── test/                 # Test dosyaları
-│   ├── api.test.js       # API endpoint testleri
-│   ├── db.test.js        # Veritabanı bağlantı testleri
-│   ├── authMiddleware.test.js  # Middleware testleri
-│   └── models/           # Model testleri
+├── test/               # Test dosyaları
+│   ├── api.test.js     # API endpoint testleri
+│   ├── db.test.js      # Veritabanı bağlantı testleri
+│   ├── authMiddleware.test.js # Middleware testleri
+│   └── models/         # Model testleri
 │       ├── user.test.js
 │       └── passwordReset.test.js
 │
-├── app.js               # Ana uygulama dosyası
-├── .env                 # Ortam değişkenleri
-└── package.json         # Proje bağımlılıkları
+├── .env               # Ortam değişkenleri
+└── package.json      # Proje bağımlılıkları
 ```
 
-## Dosya İşlevleri
+## API Endpoints
 
-### 1. Models
+### Kimlik Doğrulama İşlemleri
 
-#### User.js
+- `POST /auth/register`: Yeni kullanıcı kaydı
+- `POST /auth/login`: Kullanıcı girişi
+- `POST /auth/forgot-password`: Şifre sıfırlama talebi
+- `POST /auth/reset-password`: Şifre sıfırlama
 
-```javascript
-class User extends Model {
-  // Şifre karşılaştırma metodu
-  async comparePassword(candidatePassword) {
-    return await bcrypt.compare(candidatePassword, this.password);
-  }
-}
+### Kullanıcı İşlemleri
 
-// Model tanımlaması
-User.init({
-  id: {
-    type: DataTypes.INTEGER,
-    primaryKey: true,
-    autoIncrement: true,
-  },
-  email: {
-    type: DataTypes.STRING,
-    unique: true,
-    validate: { isEmail: true },
-  },
-  // ... diğer alanlar
-});
-```
-
-#### PasswordReset.js
-
-```javascript
-class PasswordReset extends Model {
-  // Token süre kontrolü
-  isExpired() {
-    return new Date() > this.expiresAt;
-  }
-}
-
-PasswordReset.init({ // başlatmak, ilk değer atamak
-  userId: {
-    type: DataTypes.INTEGER,
-    references: { model: "users", key: "id" },
-  },
-  token: DataTypes.STRING,
-  expiresAt: DataTypes.DATE,
-});
-```
-
-### 2. Routes
-
-#### auth.js
-
-- `/register`: Yeni kullanıcı kaydı
-- `/login`: Kullanıcı girişi
-- `/forgot-password`: Şifre sıfırlama talebi
-- `/reset-password`: Şifre sıfırlama
-
-#### users.js
-
-- GET `/users`: Tüm kullanıcıları listele (admin)
-- GET `/users/:id`: Kullanıcı bilgilerini getir
-- PUT `/users/:id`: Kullanıcı bilgilerini güncelle
-- DELETE `/users/:id`: Kullanıcı sil (admin)
-
-### 3. Middleware
-
-#### authMiddleware.js
-
-- `authenticateToken`: JWT token doğrulama
-- `authorizeRole`: Rol bazlı yetkilendirme
-- `validateEmail`: E-posta format kontrolü
-- `validatePassword`: Şifre güvenlik kontrolü
-
-## Test Süreci
-
-### 1. Model Testleri
-
-- Kullanıcı oluşturma validasyonları
-- Şifre hashleme ve karşılaştırma
-- Şifre sıfırlama token kontrolü
-
-### 2. API Testleri
-
-- Kayıt ve giriş işlemleri
-- Kullanıcı bilgileri güncelleme
-- Şifre sıfırlama süreci
-
-### 3. Middleware Testleri
-
-- Token doğrulama
-- Rol bazlı yetkilendirme
-- Veri validasyonları
+- `GET /users`: Tüm kullanıcıları listele (admin)
+- `GET /users/:id`: Kullanıcı bilgilerini getir
+- `PUT /users/:id`: Kullanıcı bilgilerini güncelle
+- `DELETE /users/:id`: Kullanıcı sil (admin)
 
 ## Kurulum
 
@@ -155,57 +96,57 @@ PORT=3000
 SECRET_KEY=gizli-anahtar-123
 
 # E-posta ayarları
-EMAIL_USER=your-email@example.com
-EMAIL_PASSWORD=your-email-password
+EMAIL_USER=your-email@gmail.com
+EMAIL_PASSWORD=your-app-password
 ```
 
-3. Veritabanını oluşturun:
-
-```bash
-mysql -u root -e "CREATE DATABASE kullanici_yonetim_sistemi"
-```
-
-4. Uygulamayı başlatın:
+3. Uygulamayı başlatın:
 
 ```bash
 npm start
 ```
 
-5. Testleri çalıştırın:
+4. Testleri çalıştırın:
 
 ```bash
 npm test
 ```
 
-## Güvenlik Özellikleri
+## Özellikler
 
-1. **Şifre Güvenliği**
+### 1. Kullanıcı Yönetimi
 
-   - Bcrypt ile şifre hashleme
-   - Minimum 8 karakter
-   - En az 1 büyük harf ve 1 rakam
+- Kullanıcı kaydı ve girişi
+- Rol tabanlı yetkilendirme (user/admin)
+- Kullanıcı bilgilerini güncelleme
+- Kullanıcı silme (admin)
 
-2. **Kimlik Doğrulama**
+### 2. Güvenlik
 
-   - JWT tabanlı token sistemi
-   - Token süre sınırı (24 saat)
+- JWT tabanlı kimlik doğrulama
+- Şifre hashleme (bcrypt)
+- Joi ile veri validasyonu
+- Rol bazlı erişim kontrolü
 
-3. **Yetkilendirme**
+### 3. Şifre Sıfırlama
 
-   - Rol bazlı erişim kontrolü (user/admin)
-   - Route bazlı yetkilendirme
+- Token tabanlı şifre sıfırlama
+- E-posta ile bilgilendirme
+- Token süre kontrolü
 
-4. **Veri Validasyonu**
-   - E-posta format kontrolü
-   - Şifre güvenlik kontrolü
-   - Giriş verisi sanitizasyonu
+### 4. Test Kapsamı
+
+- API endpoint testleri
+- Model validasyon testleri
+- Middleware testleri
+- Veritabanı bağlantı testleri
 
 ## Hata Yönetimi
 
 1. **Kimlik Doğrulama Hataları**
 
-   - 401: Token eksik
-   - 403: Geçersiz token veya yetki
+   - 401: Token bulunamadı
+   - 403: Geçersiz token veya yetki hatası
 
 2. **Validasyon Hataları**
 
@@ -214,21 +155,25 @@ npm test
 
 3. **Veritabanı Hataları**
    - 404: Kayıt bulunamadı
+   - 500: Sunucu hatası
 
-## Geliştirme Süreci
+## Geliştirme Prensipleri
 
-1. **Veritabanı Tasarımı**
+1. **MVC Mimarisi**
 
-   - Tablo yapıları ve ilişkiler
-   - Model validasyonları
+   - Model: Veritabanı şemaları ve iş mantığı
+   - Controller: İstek/yanıt yönetimi
+   - Service: İş mantığı katmanı
+   - View: API yanıtları (JSON)
 
-2. **API Geliştirme**
+2. **Kod Organizasyonu**
 
-   - Route tanımlamaları
-   - Middleware entegrasyonu
-   - Hata yönetimi
+   - Modüler yapı
+   - Tek sorumluluk prensibi
+   - DRY (Don't Repeat Yourself)
+   - SOLID prensipleri
 
-3. **Test Geliştirme**
+3. **Test Stratejisi**
    - Birim testler
    - Entegrasyon testleri
    - Test verisi yönetimi
